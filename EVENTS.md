@@ -19,18 +19,20 @@
 
 ### Two calls in detail
 
-**Search indexing (row 2): move it to the bus.** The page and the kiosk calling
-`book()` need three things right away: the request is valid, the room is free,
-and the booking is saved with an id. The clash check reads the **store**, not
-the search index, so the index adds nothing to whether a booking is correct. It
-only feeds the room-finder page. Right now, when the search cluster is down,
-`indexBooking` throws, `book()` throws, and the user gets an error. Nothing is
-saved. If indexing were a subscriber on `booking.confirmed`, then during an
-outage the booking would still succeed and the index write would land in the
-dead-letter list. Once search is back, an operator redelivers it. This is safe
-to replay because `indexBooking` overwrites the row keyed by booking id. The
-cost: the room-finder may not show a new booking for a while. It was already
-blank during the outage, so nobody loses anything.
+**Search indexing (row 2): move it to the bus.** Someone booking a room needs
+three things right away: the request is valid, the room is free, and the
+booking is saved with an id. None of these need search. The "is the room
+free?" check reads the booking **store**, not the search index, and the index
+only feeds the room-finder page. Yet `book()` calls `indexBooking` directly, so
+when the search cluster is down, that call throws, `book()` fails, and nothing
+is saved. Booking fails because it waits on something it does not need. The fix
+is to take indexing out of `book()` and make it a subscriber on
+`booking.confirmed`, like email and receipts. During a search outage the booking
+still succeeds, and only the index write fails and lands in the dead-letter
+list. Once search is back, an operator redelivers it. That is safe because
+`indexBooking` overwrites the row for the same booking id. The cost: the
+room-finder may not show a new booking for a while. The page was already blank
+during the outage, so nobody loses anything.
 
 **Refund (row 8): keep it on the bus.** The person cancelling needs two things
 right away: the booking released, and how much they will get back. `cancel()`
