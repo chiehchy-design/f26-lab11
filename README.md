@@ -67,3 +67,7 @@ paste into `EVENTS.md`. Both print the same output on every run.
 
 See the Lab 11 handout on the course page for the three milestones you show a
 TA.
+
+## AI tools used
+
+Claude Code (model: Claude Opus 5.5) for reading the code, the refund fix, and drafting EVENTS.md.

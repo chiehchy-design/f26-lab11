@@ -24,6 +24,10 @@ export class RefundLedger implements Subscriber<RefundRequested> {
   readonly name = 'RefundLedger';
 
   private readonly entries: LedgerEntry[] = [];
+  /** Message ids whose ledger entry has been written. */
+  private readonly recorded = new Set<string>();
+  /** Message ids the payment provider has settled. */
+  private readonly paid = new Set<string>();
   private readonly gateway: PaymentGateway;
 
   constructor(gateway: PaymentGateway) {
@@ -32,15 +36,23 @@ export class RefundLedger implements Subscriber<RefundRequested> {
 
   handle(message: Message<RefundRequested>): void {
     const event = message.payload;
-    this.entries.push({
-      entryId: `led-${this.entries.length + 1}`,
-      bookingId: event.bookingId,
-      organizer: event.organizer,
-      amountCents: event.amountCents,
-      reason: event.reason,
-      recordedAtMinute: message.publishedAtMinute,
-    });
-    this.gateway.refund(event.bookingId, event.amountCents);
+    // Idempotency key: the message id. Each step is remembered on its own, so a
+    // redelivery skips what already happened and finishes what did not.
+    if (!this.recorded.has(message.id)) {
+      this.entries.push({
+        entryId: `led-${this.entries.length + 1}`,
+        bookingId: event.bookingId,
+        organizer: event.organizer,
+        amountCents: event.amountCents,
+        reason: event.reason,
+        recordedAtMinute: message.publishedAtMinute,
+      });
+      this.recorded.add(message.id);
+    }
+    if (!this.paid.has(message.id)) {
+      this.gateway.refund(event.bookingId, event.amountCents);
+      this.paid.add(message.id);
+    }
   }
 
   /** Every ledger entry, oldest first. */
