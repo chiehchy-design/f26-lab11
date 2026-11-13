@@ -67,13 +67,16 @@ still went out because they come from the bus, not from search.
 
 ### Your prediction (before you run anything)
 
-The refund handler has no memory of what it has seen. It appends a ledger
-entry and then calls the provider, every time. So I expect each redelivery of
-the refund message to:
+The demo delivers the refund message **three times** in total: once when the
+booking is cancelled (the original publish), then two `redeliver` calls.
 
-- **Ledger:** add another $85.00 entry for the same booking (1, then 2, then 3 entries).
-- **Provider:** settle another $85.00 (1, then 2, then 3 settlements, so $255 paid back on an $85 booking).
-- **Bus log:** still one message, `msg-3`, with `deliveries=3`. No dead letters, because nothing throws.
+The refund handler has no memory of what it has seen. It appends a ledger
+entry and then calls the provider, every time. So I expect every delivery to
+repeat the refund:
+
+- **Ledger:** one more $85.00 entry for the same booking each time: 1 after the cancel, 2 after the first redelivery, 3 after the second.
+- **Provider:** one more $85.00 settlement each time, again 1, then 2, then 3. That is $255 paid back on an $85 booking.
+- **Bus log:** still one message, `msg-3`, with `deliveries=3` (1 original + 2 redeliveries). No dead letters, because nothing throws.
 
 ### Before your fix
 
